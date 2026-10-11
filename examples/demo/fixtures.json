@@ -1,0 +1,104 @@
+{
+  "fixture_version": 1,
+  "notice": "Every repository and source file below is synthetic demo data, not a real GitHub project.",
+  "repositories": [
+    {
+      "full_name": "demo/windows-provider-manager",
+      "description": "合成演示：Windows 桌面应用中的模型服务商配置切换示例。",
+      "language": "Python",
+      "topics": ["synthetic-demo", "model-provider", "windows"],
+      "files": {
+        "README.md": "# 合成演示：模型服务商管理\n\n此条目仅用于演示索引结构，不对应真实仓库，也未经运行验证。\n",
+        "src/providers.py": "\"\"\"Synthetic example only; it is not a real project.\"\"\"\nPROVIDERS = (\"openai\", \"anthropic\", \"local\")\n\ndef select_provider(config, name):\n    \"\"\"Return one provider configuration from the saved settings.\"\"\"\n    if name not in PROVIDERS:\n        raise ValueError(\"unknown provider\")\n    return config[\"providers\"][name]\n"
+      },
+      "evidence": [
+        {"id": "provider-switch", "path": "src/providers.py", "start_line": 2, "end_line": 8, "claim": "合成演示代码按名称从配置中选择已声明的模型服务商。"}
+      ],
+      "features": [
+        {"name": "按名称切换模型服务商配置", "description": "合成演示：根据服务商名称从配置表读取对应配置。", "evidence": ["provider-switch"], "evidence_level": "source"}
+      ],
+      "summary_zh": "合成演示条目：展示一个按名称选择模型服务商配置的 Python 示例；不是已验证的真实项目。",
+      "use_cases": ["演示：查找模型服务商配置切换的仓库索引结果"],
+      "tags": ["合成演示", "模型服务商", "配置切换", "synthetic demo", "provider routing"],
+      "interfaces": ["合成演示：Python 函数 select_provider(config, name)"],
+      "requirements": ["合成演示：假设输入配置含 providers 映射；未验证运行环境。"],
+      "limitations": ["合成演示数据，不是真实 GitHub 仓库或可安装项目。"],
+      "comparisons": [],
+      "unverified": ["合成演示代码未运行；未验证 Windows 集成或任何真实模型供应商调用。"]
+    },
+    {
+      "full_name": "demo/voice-english",
+      "description": "合成演示：显式限制英语输入的语音生成示例。",
+      "language": "Python",
+      "topics": ["synthetic-demo", "voice", "english-only"],
+      "files": {
+        "README.md": "# 合成演示：英语语音生成\n\n此合成条目明确标注英语限制，用来演示需求约束检索。\n",
+        "src/language.py": "\"\"\"Synthetic example only; it is not a real project.\"\"\"\nSUPPORTED_LANGUAGE = \"en\"\n\ndef synthesize(text, language, model):\n    if language != SUPPORTED_LANGUAGE:\n        raise ValueError(\"synthetic demo supports English only\")\n    return model.generate(text, language=language)\n"
+      },
+      "evidence": [
+        {"id": "voice-language-limit", "path": "src/language.py", "start_line": 2, "end_line": 7, "claim": "合成演示代码将语言限制为英语，并对其他语言抛出错误。"}
+      ],
+      "features": [
+        {"name": "英语语音生成输入限制", "description": "合成演示：调用前检查语言必须为 en，因而不满足中文语音生成需求。", "evidence": ["voice-language-limit"], "evidence_level": "source"}
+      ],
+      "summary_zh": "合成演示条目：展示一个只接受英语输入的语音生成流程；不是已验证的真实项目。",
+      "use_cases": ["演示：检索英语语音生成示例并识别其不支持中文的限制"],
+      "tags": ["合成演示", "语音生成", "英语限制", "synthetic demo", "english only"],
+      "interfaces": ["合成演示：Python 函数 synthesize(text, language, model)"],
+      "requirements": ["合成演示：假设模型提供 generate 方法；未验证任何真实模型。"],
+      "limitations": ["合成演示明确限制英语输入；不能据此推荐给中文语音生成任务。", "不是真实 GitHub 仓库或可安装项目。"],
+      "comparisons": ["合成演示：可用于说明硬性语言条件应参与候选筛选。"],
+      "unverified": ["合成演示代码未运行；未验证语音质量、模型或平台兼容性。"]
+    },
+    {
+      "full_name": "demo/document-qa",
+      "description": "合成演示：文档分块、向量化、检索与带证据问答流程。",
+      "language": "Python",
+      "topics": ["synthetic-demo", "document-qa", "retrieval"],
+      "files": {
+        "README.md": "# 合成演示：文档问答\n\n此条目只演示功能索引和源码证据结构。\n",
+        "src/ingest.py": "\"\"\"Synthetic example only; it is not a real project.\"\"\"\ndef ingest_document(text):\n    chunks = split_into_chunks(text, size=800, overlap=80)\n    embeddings = local_embed(chunks)\n    return {\"chunks\": chunks, \"embeddings\": embeddings}\n\ndef answer(question, documents):\n    evidence = retrieve(question, documents)\n    return draft_with_citations(question, evidence)\n"
+      },
+      "evidence": [
+        {"id": "document-ingest", "path": "src/ingest.py", "start_line": 2, "end_line": 5, "claim": "合成演示代码将文档切块并生成本地向量表示。"},
+        {"id": "document-answer", "path": "src/ingest.py", "start_line": 7, "end_line": 9, "claim": "合成演示代码先检索证据，再把证据传给带引用的回答步骤。"}
+      ],
+      "features": [
+        {"name": "文档切块与向量化", "description": "合成演示：按固定长度和重叠量切块，再生成向量。", "evidence": ["document-ingest"], "evidence_level": "source"},
+        {"name": "基于检索证据生成回答", "description": "合成演示：检索相关证据后生成带引用的答案。", "evidence": ["document-answer"], "evidence_level": "source"}
+      ],
+      "summary_zh": "合成演示条目：展示文档切块、向量化和基于检索证据回答问题的流程；不是已验证的真实项目。",
+      "use_cases": ["演示：查找文档知识库问答流程"],
+      "tags": ["合成演示", "文档问答", "知识库", "检索增强", "synthetic demo", "RAG"],
+      "interfaces": ["合成演示：Python 函数 ingest_document(text) 和 answer(question, documents)"],
+      "requirements": ["合成演示：split_into_chunks、local_embed、retrieve 和 draft_with_citations 均为未实现占位调用。"],
+      "limitations": ["合成演示代码包含占位函数，不可运行；不是真实 GitHub 仓库。"],
+      "comparisons": [],
+      "unverified": ["合成演示流程未运行；不代表真实向量数据库、模型或文件格式能力。"]
+    },
+    {
+      "full_name": "demo/react-animation",
+      "description": "合成演示：带淡入过渡参数的 React 动画组件示例。",
+      "language": "TypeScript",
+      "topics": ["synthetic-demo", "react", "animation"],
+      "files": {
+        "README.md": "# 合成演示：React 动画组件\n\n此合成条目演示按组件和效果查找 UI 仓库。\n",
+        "src/animation.tsx": "// Synthetic example only; this is not a real project.\nexport function FadeIn({ children, duration = 240 }) {\n  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration }}>\n    {children}\n  </motion.div>\n}\n"
+      },
+      "evidence": [
+        {"id": "react-fade", "path": "src/animation.tsx", "start_line": 2, "end_line": 5, "claim": "合成演示代码定义 React 淡入组件，并暴露过渡时长参数。"}
+      ],
+      "features": [
+        {"name": "React 淡入动画组件", "description": "合成演示：用透明度初始值和过渡时长构造淡入组件。", "evidence": ["react-fade"], "evidence_level": "source"}
+      ],
+      "summary_zh": "合成演示条目：展示一个可配置过渡时长的 React 淡入组件；不是已验证的真实项目。",
+      "use_cases": ["演示：搜索 React 动画组件和淡入效果"],
+      "tags": ["合成演示", "React", "动画", "淡入", "组件", "synthetic demo"],
+      "interfaces": ["合成演示：React 组件 FadeIn({ children, duration })"],
+      "requirements": ["合成演示：假设存在 React 和 motion 组件；依赖未安装或验证。"],
+      "limitations": ["合成演示代码未配套项目依赖、样式或运行页面；不是真实 GitHub 仓库。"],
+      "comparisons": [],
+      "unverified": ["合成演示组件未编译或运行；未验证可访问性或浏览器行为。"]
+    }
+  ]
+}

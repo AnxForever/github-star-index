@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "catalog_file": "data/catalog.json",
+  "cards_dir": "data/cards",
+  "sources_dir": "data/sources",
+  "database": "data/index.sqlite3",
+  "repository": {
+    "full_name": "owner/repo",
+    "url": "https://github.com/owner/repo",
+    "description": "GitHub metadata description or null",
+    "starred_at": "ISO timestamp",
+    "language": "string or null",
+    "topics": [],
+    "default_branch": "string",
+    "pushed_at": "ISO timestamp",
+    "archived": false,
+    "private": false,
+    "license": "SPDX or null"
+  },
+  "card": {
+    "schema_version": 1,
+    "full_name": "owner/repo",
+    "kind": "app|library|framework|cli|skill|collection|tutorial|research|infrastructure|other",
+    "summary_zh": "concrete purpose grounded in inspected sources",
+    "use_cases": ["natural-language user tasks"],
+    "tags": ["Chinese and English capability words"],
+    "features": [{"name": "capability", "description": "input, workflow and output", "evidence": ["ev1"], "evidence_level": "readme|docs|source"}],
+    "interfaces": ["CLI/API/UI/library entrypoints confirmed in sources"],
+    "requirements": ["confirmed prerequisites"],
+    "limitations": ["confirmed limits and explicit unknowns"],
+    "comparisons": ["distinctions that help retrieval; do not invent external claims"],
+    "evidence_level": "metadata|readme|docs|source",
+    "runtime_verified": false,
+    "source_sha": "40-character default branch commit inspected",
+    "analyzed_at": "ISO timestamp",
+    "evidence": [{"id": "ev1", "path": "path/in/repo", "start_line": 1, "end_line": 4, "excerpt": "short actual excerpt", "claim": "what these lines establish", "url": "fixed commit GitHub blob URL with line range", "local_path": "captured file relative to this index root"}],
+    "unverified": ["important gaps"],
+    "analysis_version": 1,
+    "analysis_scope": ["paths actually cited in this card"]
+  }
+}

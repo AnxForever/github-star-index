@@ -1,0 +1,17 @@
+__pycache__/
+.venv/
+*.sqlite3
+*.sqlite3-*
+data/
+cards/
+INDEX.md
+*.tmp
+*.log
+dist/
+docs/LOCAL_INDEX.md
+AGENTS.md
+.env
+.env.*
+!.env.example
+.codex/
+.claude/

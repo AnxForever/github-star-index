@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Star Index · 给 AI 的仓库知识库</title>
+  <meta name="description" content="让编程助手在需要组件、库和工具时，按需检索仓库能力、使用限制与源码依据。">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/theme.js"></script>
+  <script defer src="/icons.js"></script>
+  <script defer src="/app.js"></script>
+</head>
+<body class="task-workspace">
+  <a class="skip-link" href="#agent-setup">跳到接入说明</a>
+  <div class="app-shell">
+    <header class="site-header">
+      <a class="wordmark" href="#top" aria-label="Star Index 首页"><span data-icon="star"></span><span>Star Index</span></a>
+      <div class="header-tools"><button id="new-task" class="new-task" type="button" hidden><span data-icon="plus" data-size="15"></span>新查询</button><span id="mode-label" class="mode-label">连接中</span><button id="theme-toggle" class="icon-button" type="button" aria-label="切换到深色模式" aria-pressed="false"><span data-icon="moon"></span></button></div>
+    </header>
+    <main class="workspace" id="top">
+      <section class="task-intro" aria-labelledby="page-title">
+        <h1 id="page-title">给 AI 的仓库知识库</h1>
+        <p class="lede">让编程助手在需要组件、库和工具时，用上你已经收藏的项目。按需读取功能、限制和源码依据，继续完成手头的工作。</p>
+      </section>
+      <div id="demo-notice" class="demo-notice" hidden role="status"><strong>演示资料</strong><span>当前索引使用合成项目，不能作为真实项目推荐。</span></div>
+      <section class="agent-workflow" aria-labelledby="workflow-title">
+        <h2 id="workflow-title">你说需求，AI 查资料</h2>
+        <p class="workflow-request">“给这个前端加一些合适的交互和动效。”</p>
+        <ol class="agent-steps">
+          <li><span class="step-number">1</span><div><strong>召回可复用的项目</strong><p>根据当前技术栈和要做的功能，取回少量候选。</p><code>find_reusable_repositories</code></div></li>
+          <li><span class="step-number">2</span><div><strong>了解能力与限制</strong><p>只展开候选的功能、接入要求和未确认事项。</p><code>inspect_repository</code></div></li>
+          <li><span class="step-number">3</span><div><strong>读证据，再决定怎么用</strong><p>按证据 ID 读取固定版本的资料；由 AI 结合任务判断。</p><code>read_repository_evidence</code></div></li>
+        </ol>
+        <p class="workflow-note">这是接入后的调用方式示意，页面没有执行这段 AI 工作流。</p>
+      </section>
+      <section class="agent-setup" id="agent-setup" aria-labelledby="setup-title">
+        <div class="stripe-divider" aria-hidden="true"></div>
+        <h2 id="setup-title">接入编程助手</h2>
+        <p>Skill 告诉 AI 什么时候查，MCP 提供按需读取资料的工具。两者共用本地索引，网页不需要保持打开。</p>
+        <div class="setup-row"><span class="setup-label">Skill</span><div><code>skills/repository-reuse/SKILL.md</code><p>安装到助手的技能目录。在组件、依赖或工具选型时考虑检索；简单修改无需触发。</p></div></div>
+        <div class="setup-row"><span class="setup-label">MCP</span><div><code>python /absolute/path/github-star-index/mcp_server.py</code><p>以 stdio 启动服务，将路径替换为你的项目路径。也可用 <code>agent_context.py</code> 直接读取。</p></div></div>
+        <details class="setup-config"><summary>查看 MCP 配置示例</summary><p>适用于使用 <code>mcpServers</code> JSON 配置的客户端。替换绝对路径；Python 需在客户端运行环境中可用。</p><pre tabindex="0"><code>{
+  "mcpServers": {
+    "repository-knowledge": {
+      "command": "python",
+      "args": ["/absolute/path/github-star-index/mcp_server.py"]
+    }
+  }
+}</code></pre></details>
+        <p class="setup-note">本页不检测助手的连接状态。是否发起检索由助手决定；Skill 的触发说明需要在助手重新加载后生效。</p>
+      </section>
+      <details class="retrieval-console" id="retrieval-console">
+        <summary><span data-icon="terminal" data-size="16"></span><span>检索诊断<small>查看索引会返回哪些资料</small></span><span data-icon="chevron-down" data-size="16"></span></summary>
+      <section class="composer-section" aria-label="检索诊断">
+        <form id="search-form" class="task-composer" role="search">
+          <label class="composer-label" for="search-query">模拟一次任务查询</label>
+          <textarea id="search-query" name="q" rows="3" maxlength="1800" required placeholder="例如：我想给本地文档做一个问答助手，回答要能引用来源，最好支持中文。" aria-describedby="search-help"></textarea>
+          <div class="composer-conditions" role="group" aria-label="补充使用条件"><span>使用条件</span><button class="condition-chip" type="button" data-condition="本地运行" aria-pressed="false"><span data-icon="plus" data-size="12"></span>本地运行</button><button class="condition-chip" type="button" data-condition="Windows" aria-pressed="false"><span data-icon="plus" data-size="12"></span>Windows</button><button class="condition-chip" type="button" data-condition="中文支持" aria-pressed="false"><span data-icon="plus" data-size="12"></span>中文支持</button></div>
+          <div class="composer-actions"><span class="composer-hint"><kbd>Ctrl</kbd> <kbd>Enter</kbd> 查询</span><div class="composer-buttons"><button id="cancel-search" class="cancel-search" type="button" hidden>取消</button><button id="submit-query" class="search-submit" type="submit">查看召回<span data-icon="arrow-right" data-size="16"></span></button></div></div>
+        </form>
+        <p class="search-help" id="search-help">诊断视图使用词法检索。使用条件作为检索词，不等于经过兼容性核验；AI 接口返回更精简的资料。</p>
+        <p id="draft-notice" class="draft-notice" hidden>需求已修改，重新查找后更新下面的候选。</p>
+      </section>
+      <section id="welcome-state" class="welcome-state" aria-labelledby="welcome-title">
+        <div class="welcome-heading"><h2 id="welcome-title">查询示例</h2><p>用于观察召回资料，不会调用模型。</p></div>
+        <div class="scenario-list">
+          <button class="query-sample scenario-card" type="button" data-query="本地文档问答知识库，回答附带来源引用"><span class="scenario-icon" data-icon="book-open"></span><span class="scenario-copy"><strong>给本地文档做一个问答助手</strong><span>想让资料可检索，回答能找到出处。</span></span><span data-icon="arrow-up-right" data-size="17"></span></button>
+          <button class="query-sample scenario-card" type="button" data-query="React 动画组件，接入现有前端项目"><span class="scenario-icon" data-icon="boxes"></span><span class="scenario-copy"><strong>给现有 React 页面加点动效</strong><span>找可复用的交互和组件，省下重复开发。</span></span><span data-icon="arrow-up-right" data-size="17"></span></button>
+          <button class="query-sample scenario-card" type="button" data-query="Windows 管理 AI 编程工具的模型 API 配置"><span class="scenario-icon" data-icon="terminal"></span><span class="scenario-copy"><strong>统一管理编程助手的模型配置</strong><span>切换不同工具的 API，不再到处改配置文件。</span></span><span data-icon="arrow-up-right" data-size="17"></span></button>
+        </div>
+      </section>
+      <section class="catalog" id="catalog" hidden aria-label="需求候选">
+        <div class="stripe-divider" aria-hidden="true"></div>
+        <header class="answer-header"><h2 id="results-heading" tabindex="-1">与你的需求相关的项目</h2><p id="results-summary" class="results-summary" aria-live="polite"></p></header>
+        <p id="task-recap" class="task-recap"></p>
+        <div class="answer-toolbar">
+          <div class="compare-tools"><span id="compare-count" class="compare-count" aria-live="polite">已选 0 项</span><button id="compare-button" class="compare-button" type="button" disabled><span data-icon="git-compare-arrows" data-size="15"></span>比较这些候选</button><button id="clear-compare" class="clear-compare" type="button" hidden>清空</button></div>
+          <details id="filter-details" class="filter-details"><summary><span data-icon="sliders-horizontal" data-size="15"></span>缩小范围<span id="filter-active-count" class="filter-active-count" hidden></span></summary><form id="filters" class="filters">
+            <div class="filter-field"><label for="filter-kind">项目形式</label><select id="filter-kind" name="kind"><option value="">全部形式</option></select></div>
+            <div class="filter-field"><label for="filter-language">编程语言</label><select id="filter-language" name="language"><option value="">全部语言</option></select></div>
+            <div class="filter-field"><label for="filter-evidence">分析依据</label><select id="filter-evidence" name="evidence_level"><option value="">全部依据</option></select></div>
+            <div class="filter-field"><label for="filter-archived">项目状态</label><select id="filter-archived" name="archived"><option value="any">包括已归档</option><option value="false">排除已归档</option><option value="true">仅已归档</option></select></div>
+            <div class="filter-actions"><button id="clear-filters" class="clear-filters" type="reset">重置范围</button><button class="apply-filters" type="submit">重新查找</button></div>
+          </form></details>
+        </div>
+        <p id="answer-basis" class="answer-basis" hidden>根据现有分析与需求词匹配；相关不等于满足全部条件，选用前请核对前提和限制。</p>
+        <div id="live-message" class="live-message" role="status" aria-live="polite" hidden></div>
+        <div id="results-list" class="results-list"></div>
+        <button id="load-more" class="load-more" type="button" hidden>再看几个备选</button>
+        <section id="empty-state" class="empty-state" hidden aria-live="polite"><span data-icon="search" class="empty-mark" data-size="28"></span><h3 id="empty-title">现有分析里还没有找到匹配项</h3><p id="empty-description">试着只保留核心任务，或把使用条件分开确认。</p><button id="reset-view" class="secondary-button" type="button">调整我的需求</button></section>
+        <section id="error-state" class="error-state" hidden role="alert"><div><h3 id="error-title">暂时无法查找项目</h3><p id="error-description">请稍后重试。</p></div><button id="retry-button" class="secondary-button" type="button">重试</button></section>
+      </section>
+      </details>
+    </main>
+    <footer class="site-footer"><details id="index-status" class="index-status" open><summary>本地索引状态</summary><div class="index-meta"><span id="index-owner"></span><span><span id="stat-repositories">—</span> 个项目已入索引</span><span id="index-built"></span></div><div class="connection-line"><span id="connection-dot" class="connection-dot"></span><span id="connection-label">读取索引中</span></div><p>依据来自固定版本的项目资料与代表性代码。源码阅读与实际运行分别记录；“当前版本”相对于本地快照，不代表刚刚检查过 GitHub。</p></details><span class="footer-brand">Star Index</span></footer>
+  </div>
+  <aside class="detail-panel" id="detail-panel" aria-label="项目分析与对比" aria-hidden="true" inert><button class="detail-backdrop" type="button" tabindex="-1" aria-label="关闭详情"></button><div class="detail-sheet" role="document"><div class="detail-mobile-bar"><span>项目分析与依据</span><button type="button" id="close-detail" class="icon-button" aria-label="关闭详情"><span data-icon="x"></span></button></div><div id="detail-content" class="detail-content"></div></div></aside>
+</body>
+</html>
