@@ -18,7 +18,7 @@ Start with [requirements](docs/REQUIREMENTS.md), [the handoff](docs/HANDOFF.md),
 - Use independent data roots for examples and checks, preserving personal indexes.
 - Distinguish docs inspected, code inspected and runtime verified.
 
-This initial source snapshot does not include a maintained automated test suite. The current productization pass did not add or run tests. In contributions, report exactly what you checked and what remains unverified; start with the acceptance scenarios in the handoff.
+This source snapshot includes a small unit suite under `tests/` (`python -m pytest tests/`), covering index building/search and pinned-snapshot capture. It does not cover the MCP adapter, the Web interface or recommendation quality. In contributions, report exactly what you checked and what remains unverified; start with the acceptance scenarios in the handoff.
 
 ## Code map
 

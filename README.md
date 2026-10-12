@@ -78,4 +78,4 @@ Search uses bilingual SQLite FTS5 lexical matching without embeddings or model r
 
 Personal catalogs, source snapshots, cards, databases and generated indexes stay local in ignored paths. The local HTTP server binds to `127.0.0.1`; `--public-only` excludes private and visibility-unknown entries before ranking and pagination. This is not internet hosting or authentication. Captured third-party text keeps its own rights; it is not covered by this project's [MIT license](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-This preview has not completed browser acceptance, real-client MCP interoperability, cross-platform installation checks, or comparative recommendation-quality evaluation. No tests were added or run during this productization pass.
+This preview has not completed browser acceptance, real-client MCP interoperability, cross-platform installation checks, or comparative recommendation-quality evaluation. A small unit suite lives in `tests/` (`python -m pytest tests/`), covering index building/search and pinned-snapshot capture; it does not cover the MCP adapter, the Web interface or recommendation quality.
