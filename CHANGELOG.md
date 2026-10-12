@@ -2,6 +2,9 @@
 
 ## 0.1.0 preview — unreleased
 
+- Retrieval quality: unknown multi-character Chinese phrases no longer collapse into one conjunctive concept group, which previously made queries such as “向量数据库检索” return zero candidates.
+- Retrieval quality: broader bilingual concept coverage (vector database, transcription, speech synthesis, crawler, database, chat, deploy, prompt, fine-tune, evaluation), so operational terms map to real repositories instead of noise bigrams.
+- Feature attribution: `matched_features` now fires whenever a feature's own indexed text matched the query, independent of which document ranked first, instead of requiring the feature to be the primary hit. Attribution stays strict, so repository-level context cannot light up unrelated features.
 - Agent-first workflow: compact candidate discovery, feature inspection and evidence retrieval through MCP and CLI.
 - Portable repository-reuse Skill for component, dependency and implementation choices during development.
 - Requirements and developer handoff; Web reframed as integration guidance and retrieval diagnostics.

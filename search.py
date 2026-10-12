@@ -89,6 +89,19 @@ _CONCEPTS: dict[str, tuple[tuple[str, ...], float]] = {
     "模型": (("model", "models", "llm"), 0.9),
     "交互": (("interactive", "interact", "interactivity"), 0.8),
     "界面": (("ui", "interface", "frontend"), 0.7),
+    "向量数据库": (("vector database", "vector db", "vector store", "vector search", "embedding store", "embedding database", "vector index"), 1.3),
+    "数据库": (("database", "db", "sql", "sqlite", "postgres", "postgresql", "mysql"), 0.95),
+    "转录": (("transcribe", "transcription", "transcript", "speech to text", "speech-to-text", "asr", "caption"), 1.2),
+    "语音合成": (("text to speech", "text-to-speech", "tts", "speech synthesis", "voice synthesis"), 1.2),
+    "爬虫": (("crawler", "crawling", "scraper", "scraping", "spider"), 1.15),
+    "自动化": (("automation", "automate", "automated", "scripting"), 1.0),
+    "检索": (("search", "retrieval", "retrieve", "lookup"), 0.9),
+    "聊天": (("chat", "chatbot", "conversation", "conversational", "messaging"), 0.9),
+    "部署": (("deploy", "deployment", "self-host", "self hosted", "docker"), 0.85),
+    "提示词": (("prompt", "prompts", "system prompt"), 0.8),
+    "技能": (("skill", "skills"), 0.75),
+    "微调": (("fine-tune", "fine tuning", "finetune", "lora", "training"), 0.9),
+    "评测": (("benchmark", "evaluation", "eval", "leaderboard"), 0.85),
     "工具": (("tool", "tools", "toolkit", "cli", "application"), 0.45),
     "变成": (("convert", "conversion", "transform", "generate", "turn into"), 0.45),
     "生成": (("generate", "generation", "create"), 0.55),
@@ -219,8 +232,18 @@ def query_plan(query: str, extra_terms: list[str] | None = None) -> tuple[list[s
                 if segment:
                     if len(segment) == 1:
                         add_group((segment,), 0.18, segment)
-                    else:
+                    elif len(segment) == 2:
                         add_group((segment,), 0.24, segment)
+                    else:
+                        # An unknown multi-character Chinese phrase has no
+                        # synonym list, so a single conjunctive group would
+                        # demand every overlapping bigram at once and reject
+                        # virtually every real document (for example
+                        # “向量数据库检索” matched nothing). Emit one low-weight
+                        # group per bigram instead, so a phrase still scores
+                        # proportionally to how much of it appears.
+                        for offset in range(len(segment) - 1):
+                            add_group((segment[offset : offset + 2],), 0.2, segment[offset : offset + 2])
                 index = max(run_end, index + 1)
         elif any(ch.isalnum() for ch in token):
             term = token.casefold()
@@ -1040,6 +1063,21 @@ def search_repositories(
                         break
                 if len(evidence) >= 3:
                     break
+            # Attribute features by their own document hit. A feature counts
+            # only when the query concepts matched that feature's text, so
+            # unrelated capabilities are not reported just because the
+            # repository's card or README also surfaced.
+            feature_matches: list[dict] = []
+            for sort_key, row, coverage in ranked_rows:
+                if row["doc_type"] != "feature" or coverage[1] < 1:
+                    continue
+                feature_matches.append({
+                    "name": row["title"],
+                    "evidence_level": row["evidence_level"],
+                    "evidence": _load_evidence(row["evidence_json"], full_name, row["source_sha"], excerpt_limit=240),
+                })
+                if len(feature_matches) >= 5:
+                    break
             # The matched card summary may not itself carry evidence IDs. In
             # that case, expose a few of the repository's inspected source
             # excerpts as context, clearly distinguished from direct matches.
@@ -1063,7 +1101,8 @@ def search_repositories(
             result.append({**meta, "lexical_coverage": {"matched_groups": matched_groups, "total_groups": total_groups,
                                                             "ratio": round(ratio, 3), "matched": matched_labels,
                                                             "missing": missing_labels},
-                           "match": match_out, "evidence": evidence})
+                           "match": match_out, "evidence": evidence,
+                           "feature_matches": feature_matches})
             if len(result) >= limit:
                 break
         return {"query": query, "query_terms": terms, "count": len(result), "results": result}
@@ -1231,6 +1270,10 @@ def main(argv: list[str] | None = None) -> int:
                                          kind=options.kind, language=options.language, archived=archived,
                                          evidence_level=options.evidence_level, extra_terms=extras,
                                          include_private=not options.public_only)
+            # feature_matches is the service-side attribution input; the public
+            # search surface does not repeat it.
+            for item in result.get("results", []):
+                item.pop("feature_matches", None)
             print(json.dumps(result, ensure_ascii=False, indent=2) if options.json else _format_search(result))
         elif options.command == "show":
             result = show_repo(options.repository, root=options.root, db_path=options.db)

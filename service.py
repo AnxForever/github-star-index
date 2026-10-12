@@ -135,37 +135,44 @@ def _card_evidence_view(full_name: str, source_sha: str | None, evidence: Any) -
 
 
 def _matched_card_features(item: dict[str, Any], card: dict[str, Any], full_name: str) -> list[dict[str, Any]]:
-    """Map only an exact feature-document hit to features sharing direct evidence."""
-    match = item.get("match")
-    if not isinstance(match, dict) or match.get("type") != "feature":
-        return []
-    title = match.get("title")
-    if not isinstance(title, str) or not title:
-        return []
+    """Surface card features whose own document text matched the query.
 
-    matched_evidence_ids = {
-        evidence.get("id")
-        for evidence in item.get("evidence", [])
-        if isinstance(evidence, dict)
-        and evidence.get("match_context") == "matched document"
-        and isinstance(evidence.get("id"), str)
-    }
-    if not matched_evidence_ids:
+    Detection is deliberately independent of which document ranked first. A
+    natural-language task usually ranks the project card or README above the
+    individual feature document, so requiring a feature primary hit hid the
+    most useful signal ("which concrete capability matched") for roughly five
+    of every six candidates.
+
+    Attribution stays strict: a feature is reported only when its own indexed
+    text matched the query concepts, so unrelated capabilities are not shown
+    just because the repository's card or README also surfaced.
+    """
+    hits = item.get("feature_matches")
+    if not isinstance(hits, list) or not hits:
+        return []
+    matched_names = [
+        hit.get("name") for hit in hits
+        if isinstance(hit, dict) and isinstance(hit.get("name"), str) and hit.get("name")
+    ]
+    if not matched_names:
         return []
 
     card_evidence = card.get("evidence")
-    if not isinstance(card_evidence, list):
-        return []
     evidence_by_id = {
         evidence.get("id"): evidence
-        for evidence in card_evidence
+        for evidence in (card_evidence if isinstance(card_evidence, list) else [])
         if isinstance(evidence, dict) and isinstance(evidence.get("id"), str)
+    }
+    features_by_name = {
+        feature.get("name"): feature
+        for feature in (card.get("features") if isinstance(card.get("features"), list) else [])
+        if isinstance(feature, dict) and isinstance(feature.get("name"), str)
     }
 
     output: list[dict[str, Any]] = []
-    features = card.get("features")
-    for feature in features if isinstance(features, list) else []:
-        if not isinstance(feature, dict) or feature.get("name") != title:
+    for name in matched_names:
+        feature = features_by_name.get(name)
+        if not isinstance(feature, dict):
             continue
         level = feature.get("evidence_level")
         # Metadata claims are not shown as evidence-backed feature matches.
@@ -174,23 +181,19 @@ def _matched_card_features(item: dict[str, Any], card: dict[str, Any], full_name
         refs = feature.get("evidence")
         if not isinstance(refs, list):
             continue
-        cited_ids = [ref for ref in refs if isinstance(ref, str) and ref in evidence_by_id]
-        matched_ids = [ref for ref in cited_ids if ref in matched_evidence_ids]
-        if not matched_ids:
-            continue
         citations = [
-            view for ref in matched_ids
+            view for ref in refs if isinstance(ref, str) and ref in evidence_by_id
             if (view := _card_evidence_view(full_name, card.get("source_sha"), evidence_by_id[ref])) is not None
         ][:3]
         if not citations:
             continue
         output.append({
-            "name": title,
+            "name": name,
             "description": feature.get("description") if isinstance(feature.get("description"), str) else "",
             "evidence_level": level,
             "evidence": citations,
         })
-        if len(output) >= 3:
+        if len(output) >= 4:
             break
     return output
 
@@ -440,6 +443,10 @@ class IndexService:
                 item, rows_by_name.get(item.get("full_name", "").casefold())
                 if isinstance(item.get("full_name"), str) else None,
             )
+            # feature_matches is the retrieval-side attribution input; the
+            # bounded public view is selection_brief.matched_features. Drop the
+            # duplicate so agent-facing payloads stay within budget.
+            item.pop("feature_matches", None)
             coverage = item.get("lexical_coverage") or {}
             evidence = item.get("evidence") or []
             matched = sum(1 for entry in evidence if entry.get("match_context") == "matched document")

@@ -53,7 +53,7 @@ python webapp.py --public-only
 }
 ```
 
-`matched_features` 只在主命中类型为 `feature`、卡片功能名与命中文档标题完全相同，且该功能引用的证据 ID 出现在 `match_context="matched document"` 的本次命中证据中时返回。仓库背景证据不会用于功能关联；README/source_doc 命中也不会按路径相似度猜功能。证据链接固定到卡片记录的 commit。`purpose` 是项目概述，不单独证明本次需求匹配。
+`matched_features` 现在按“功能文档自身的正文命中查询概念”归属，不再要求功能文档必须排在主命中位置。自然语言任务通常让项目卡或 README 排在功能文档之上，旧规则因此让大多数候选的功能命中恒为空。现在任何命中类型都可以关联功能，但仍保持严格：只有该功能的索引文本自己命中了查询概念才会出现，仓库背景证据不会促成功能关联，也不会按路径相似度猜功能。每个功能最多返回 4 项，每项证据最多 3 条。证据链接固定到卡片记录的 commit。`purpose` 是项目概述，不单独证明本次需求匹配。
 
 `candidate_state` 可为 `feature_evidence_match`、`task_summary_match`、`matched_excerpt_only`、`metadata_only`、`stale_or_unfinalized` 或 `no_current_card`。过期、未完成或新鲜度未知的卡片不会贡献用途、功能、前提、限制或未验证项；卡片整体证据级别仅为 metadata，或本次只有仓库 metadata 命中时，标记为 `metadata_only`，不能当作已核查的功能推荐。`runtime_verified=false` 表示项目代码没有在索引流程中运行验证。`missing_conditions` 是没有在命中文档片段中检索到的查询概念，每项状态恒为 `unknown`，不能解释成项目不支持该条件。`basis` 为 `matched_excerpt`、`card_summary` 或 `none`，说明当前界面依据来自哪里。
 

@@ -323,6 +323,50 @@ class SearchIndexTests(unittest.TestCase):
         self.assertEqual(shown_private["repository"]["visibility"], "private")
         self.assertEqual(summary["private"], 1)
 
+    def test_unknown_chinese_phrase_recalls_instead_of_returning_nothing(self) -> None:
+        # Regression: an unmatched multi-character Chinese phrase used to become
+        # one conjunctive group demanding every overlapping bigram at once, so a
+        # query such as this matched zero documents and returned no candidates at
+        # all even though the corpus contained relevant repositories.
+        result = search.search_repositories("本地向量数据库语义检索方案", root=self.root)
+        self.assertGreater(len(result["results"]), 0)
+        names = [item["full_name"] for item in result["results"]]
+        self.assertIn("acme/doc-assistant", names)
+
+    def test_natural_language_task_attributes_features_beyond_primary_hit(self) -> None:
+        # Regression: feature attribution used to require the feature document to
+        # rank first. A natural-language task ranks the card above the feature,
+        # which silently produced zero matched features for most candidates.
+        from service import IndexService  # noqa: PLC0415 - optional service layer
+
+        service = IndexService(root=self.root)
+        result = service.search("可复用的 React 界面组件库", limit=5)
+        item = next(
+            entry for entry in result["results"] if entry["full_name"] == "acme/ui-kit"
+        )
+        brief = item["selection_brief"]
+        self.assertEqual(brief["candidate_state"], "feature_evidence_match")
+        self.assertTrue(brief["matched_features"])
+        names = [feature["name"] for feature in brief["matched_features"]]
+        self.assertIn("提供可复用的 React 界面组件", names)
+
+    def test_feature_attribution_excludes_repositories_that_only_matched_card(self) -> None:
+        # A repository whose card or README surfaces must not report an unrelated
+        # feature merely because repository-level evidence was loaded as context.
+        from service import IndexService  # noqa: PLC0415 - optional service layer
+
+        service = IndexService(root=self.root)
+        result = service.search("语音克隆生成语音", limit=5)
+        doc = next(
+            (entry for entry in result["results"] if entry["full_name"] == "acme/doc-assistant"),
+            None,
+        )
+        # doc-assistant may not appear at all; when it does, its PDF feature must
+        # not be attributed to a query about voice cloning.
+        if doc is not None:
+            feature_names = [feature["name"] for feature in doc["selection_brief"]["matched_features"]]
+            self.assertNotIn("解析 PDF 文件并返回文本内容", feature_names)
+
     def test_failed_rebuild_preserves_previous_database(self) -> None:
         before = self.db.read_bytes()
         (self.root / "data" / "catalog.json").write_text("{}", encoding="utf-8")
