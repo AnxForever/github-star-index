@@ -75,7 +75,10 @@ def safe_repo_path(path: str):
     return p
 
 
-def store_file(repo: str, sha: str, obj, snapshot: Path, *, root: Path = ROOT):
+def store_file(repo: str, sha: str, obj, snapshot: Path, *, root: Path | None = None):
+    # Resolved at call time so a caller-supplied or patched ROOT takes effect;
+    # a bound default would freeze the import-time value and reject valid roots.
+    root = Path(root or ROOT)
     path = obj["path"]
     safe_repo_path(path)
     if obj.get("type") != "file":
@@ -101,8 +104,8 @@ def store_file(repo: str, sha: str, obj, snapshot: Path, *, root: Path = ROOT):
             "lines": len(text.splitlines()), "url": f"https://github.com/{repo}/blob/{sha}/{quote(path)}"}
 
 
-def capture(repo: dict, paths: list[str] | None = None, refresh=False, *, root: Path = ROOT):
-    root = Path(root).resolve()
+def capture(repo: dict, paths: list[str] | None = None, refresh=False, *, root: Path | None = None):
+    root = Path(root or ROOT).resolve()
     name = repo["full_name"]
     folder = root / "data" / "sources" / slug(name)
     manifest_path = folder / "manifest.json"
