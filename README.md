@@ -20,7 +20,47 @@ python mcp_server.py
 python mcp_server.py --root /path/to/my-index --public-only
 ```
 
-The server defaults to the project directory as its index root. It reads the index and does not make model calls. For the agent to consider this knowledge during development, install the portable [repository-reuse skill](skills/repository-reuse/SKILL.md) in the target agent's skill directory. Skill routing is guidance; invocation and MCP tool availability depend on the client and its configuration. See [interface contracts](docs/INTERFACES.md) for tool arguments and result fields. Real-client interoperability has not yet been verified.
+The server defaults to the project directory as its index root. It reads the index and does not make model calls. For the agent to consider this knowledge during development, install the portable [repository-reuse skill](skills/repository-reuse/SKILL.md) in the target agent's skill directory. Skill routing is guidance; invocation and MCP tool availability depend on the client and its configuration. See [interface contracts](docs/INTERFACES.md) for tool arguments and result fields.
+
+### Verified setup on this machine (Pi)
+
+This checkout is wired into the local Pi agent and was exercised end to end: a real Pi session loaded the skill and the MCP tools, called `find_reusable_repositories` for a React motion task, and reported matched features from `DavidHDev/react-bits` and `greensock/gsap-skills`. What made it work:
+
+1. MCP server entry in `~/.pi/agent/mcp.json` (Pi reads `mcpServers`; a separate `mcp-servers.json` is unrelated):
+
+   ```json
+   {
+     "mcpServers": {
+       "star-index": {
+         "type": "stdio",
+         "command": "C:\\Users\\<you>\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+         "args": ["D:\\github-star-index\\mcp_server.py"],
+         "description": "Local GitHub Star Index: find and inspect the user's starred repositories before choosing to build or reuse.",
+         "toolExposure": {
+           "find_reusable_repositories": "direct",
+           "inspect_repository": "direct",
+           "read_repository_evidence": "direct"
+         }
+       }
+     }
+   }
+   ```
+
+   `direct` exposure declares the three progressive tools to the model; the remaining tools stay reachable through command mode so the system prompt stays small. Verify with `pi mcp list` (expect `star-index: connected, 7 tools`).
+
+2. Skill path in `~/.pi/agent/settings.json`. That file uses a whitelist model: `!**` excludes everything, so an exact inclusion must be listed twice — once as the directory and once as `+path` — for discovery to pick it up:
+
+   ```json
+   "skills": [
+     "D:/github-star-index/skills/repository-reuse",
+     "!**",
+     "+D:/github-star-index/skills/repository-reuse/SKILL.md"
+   ]
+   ```
+
+   Verify by asking a fresh session to list its skills, or with `pi -p "..." --skill D:/github-star-index/skills/repository-reuse`. Run `/reload` after editing settings during a session.
+
+Both steps use absolute paths to this checkout; a personal index root can be passed with `--root` in `args` if it differs from the checkout.
 
 When MCP is unavailable but the index files are accessible, the bounded CLI offers the same progressive flow. Call the script from this checkout by its path; the current working directory may be another project:
 

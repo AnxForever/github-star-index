@@ -2,6 +2,7 @@
 
 ## 0.1.0 preview — unreleased
 
+- Wired into the local Pi agent and verified end to end: `star-index` MCP server connected with 7 tools (three at `direct` exposure) and a real session used the `repository-reuse` skill to answer a React motion-selection task through `find → inspect → evidence`. Setup steps are documented in the README.
 - Optional semantic retrieval: an embedding layer (`embeddings.py`) and `search.py embed` / `embed-status` commands fuse lexical and vector ranking with reciprocal rank fusion. Off by default and fully inert without a configured provider, so existing lexical behavior is unchanged. The only network step is the embedding build, which the user runs explicitly.
 - Retrieval quality: unknown multi-character Chinese phrases no longer collapse into one conjunctive concept group, which previously made queries such as “向量数据库检索” return zero candidates.
 - Retrieval quality: broader bilingual concept coverage (vector database, transcription, speech synthesis, crawler, database, chat, deploy, prompt, fine-tune, evaluation), so operational terms map to real repositories instead of noise bigrams.

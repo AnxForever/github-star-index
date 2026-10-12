@@ -125,4 +125,6 @@ python agent_context.py --demo find "本地文档问答知识库" --terms RAG ci
 
 CLI 输出 UTF-8 JSON。可用全局参数 `--root`、`--db`、`--public-only`；`--demo` 与 `--root`/`--db` 不能组合。
 
-实现使用按行分隔的 JSON-RPC，stdout 仅输出协议数据，诊断写 stderr。依据官方 [stdio](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio)、[discovery](https://modelcontextprotocol.io/specification/2026-07-28/server/discover)、[versioning](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning) 和 [tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) 资料，包含当前协议路径与旧版 initialize 兼容路径。尚未在真实客户端完成互操作验收。
+实现使用按行分隔的 JSON-RPC，stdout 仅输出协议数据，诊断写 stderr。依据官方 [stdio](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/stdio)、[discovery](https://modelcontextprotocol.io/specification/2026-07-28/server/discover)、[versioning](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning) 和 [tools](https://modelcontextprotocol.io/specification/2026-07-28/server/tools) 资料，包含当前协议路径与旧版 initialize 兼容路径。
+
+已在 Pi 完成一次真实客户端互操作验收：MCP 服务注册后 `pi mcp list` 报告 `star-index: connected, 7 tools`，单个真实会话加载了 `repository-reuse` skill 与三个 `direct` 工具，并按 `find → inspect → evidence` 流程回答了一个 React 动效选型任务。接入步骤与配置写法见根目录 `README.md` 的“Verified setup on this machine”。
