@@ -13,7 +13,7 @@ PUBLIC_FILES = (
     ".gitignore", "ANALYSIS_GUIDE.md", "LICENSE", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
     "schema.json", "search.py", "catalog_sync.py", "source_sync.py", "refresh.py", "card_tools.py",
     "render_catalog.py", "audit_index.py", "analysis.py", "service.py", "agent_context.py", "webapp.py", "mcp_server.py",
-    "demo.py", "release_bundle.py", "examples/demo/fixtures.json",
+    "demo.py", "release_bundle.py", "eval_retrieval.py", "examples/demo/fixtures.json",
     "tests/test_search.py", "tests/test_sources.py",
     "web/index.html", "web/app.js", "web/styles.css",
     "web/icons.js", "web/theme.js", "web/THIRD_PARTY_NOTICES.txt",

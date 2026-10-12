@@ -217,9 +217,9 @@ def _status(detail: dict[str, Any], service: IndexService) -> str:
 def _repo_metadata(repo: Any) -> dict[str, Any]:
     if not isinstance(repo, dict):
         return {}
-    keys = ("full_name", "url", "description", "language", "topics", "archived", "private", "kind", "evidence_level")
+    keys = ("full_name", "url", "description", "language", "license", "topics", "archived", "private", "kind", "evidence_level")
     result = {key: repo.get(key) for key in keys if key in repo}
-    for key, maximum in (("full_name", 255), ("language", 100), ("kind", 60), ("evidence_level", 32)):
+    for key, maximum in (("full_name", 255), ("language", 100), ("license", 64), ("kind", 60), ("evidence_level", 32)):
         if isinstance(result.get(key), str):
             result[key], clipped = _short(result[key], maximum, key)
             if clipped:

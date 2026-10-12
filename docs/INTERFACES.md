@@ -57,6 +57,8 @@ python webapp.py --public-only
 
 `candidate_state` 可为 `feature_evidence_match`、`task_summary_match`、`matched_excerpt_only`、`metadata_only`、`stale_or_unfinalized` 或 `no_current_card`。过期、未完成或新鲜度未知的卡片不会贡献用途、功能、前提、限制或未验证项；卡片整体证据级别仅为 metadata，或本次只有仓库 metadata 命中时，标记为 `metadata_only`，不能当作已核查的功能推荐。`runtime_verified=false` 表示项目代码没有在索引流程中运行验证。`missing_conditions` 是没有在命中文档片段中检索到的查询概念，每项状态恒为 `unknown`，不能解释成项目不支持该条件。`basis` 为 `matched_excerpt`、`card_summary` 或 `none`，说明当前界面依据来自哪里。
 
+`license` 是 GitHub 记录到的 SPDX 标识（如 `MIT`、`Apache-2.0`、`AGPL-3.0`），取自同步时的仓库元数据，随候选、详情和 `inspect_repository` 一并返回；`null` 表示 GitHub 未给出标识或为 `NONE`/`NOASSERTION`，不代表可以任意使用。它是复用决策的硬约束线索，不是许可合规结论。
+
 公开范围模式在排名和分页前只查询 `private=0`，统计也只计算公开子集。可见性未知的项目排除；该模式不提供认证或公网部署能力。
 
 ## MCP

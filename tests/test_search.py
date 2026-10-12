@@ -367,6 +367,19 @@ class SearchIndexTests(unittest.TestCase):
             feature_names = [feature["name"] for feature in doc["selection_brief"]["matched_features"]]
             self.assertNotIn("解析 PDF 文件并返回文本内容", feature_names)
 
+    def test_license_is_exposed_on_candidates_and_details(self) -> None:
+        # License is a reuse hard constraint (MIT vs AGPL vs unknown), so it must
+        # reach the agent alongside the candidate rather than staying catalog-only.
+        result = search.search_repositories("React components", root=self.root)
+        item = next(entry for entry in result["results"] if entry["full_name"] == "acme/ui-kit")
+        self.assertEqual(item["license"], "MIT")
+        shown = search.show_repo("acme/ui-kit", root=self.root)
+        self.assertEqual(shown["repository"]["license"], "MIT")
+        # A repository whose catalog record has no license reports null, which
+        # means unknown rather than permissive.
+        basic = search.show_repo("acme/basic", root=self.root)
+        self.assertIsNone(basic["repository"]["license"])
+
     def test_failed_rebuild_preserves_previous_database(self) -> None:
         before = self.db.read_bytes()
         (self.root / "data" / "catalog.json").write_text("{}", encoding="utf-8")

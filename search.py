@@ -921,12 +921,26 @@ def _query_excerpt(
 
 
 def _repo_row(row: sqlite3.Row) -> dict:
+    license_id = None
+    raw_repository = row["repository_json"] if "repository_json" in row.keys() else None
+    if raw_repository:
+        try:
+            stored = json.loads(raw_repository)
+        except (TypeError, json.JSONDecodeError):
+            stored = None
+        if isinstance(stored, dict):
+            value = stored.get("license")
+            if isinstance(value, dict):
+                value = value.get("spdx_id") or value.get("name")
+            if isinstance(value, str) and value.strip() and value.strip().upper() not in {"NONE", "NOASSERTION"}:
+                license_id = value.strip()
     return {
         "full_name": row["full_name"],
         "url": row["url"],
         "description": row["description"],
         "language": row["language"],
         "topics": json.loads(row["topics_json"] or "[]"),
+        "license": license_id,
         "archived": bool(row["archived"]),
         "private": None if row["private"] is None else bool(row["private"]),
         "visibility": row["visibility"],

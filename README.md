@@ -74,6 +74,16 @@ Open http://127.0.0.1:8765. The demo uses four fictional repositories and synthe
 
 Search uses bilingual SQLite FTS5 lexical matching without embeddings or model reranking. Candidate order is not a suitability score. Missing terms mean unknown, not unsupported. Source-level analysis samples representative paths; it is not a complete audit or runtime verification. A citation matching captured lines does not prove that the interpretation is correct.
 
+Each candidate and detail view reports the catalog `license` (SPDX id, or `null` when GitHub gives none). It is a reuse constraint signal from synced metadata, not a license-compliance conclusion.
+
+`eval_retrieval.py` scores retrieval against a labeled task set (`data/eval/labels.json`, kept local). It reports recall@k, precision@k, MRR, empty results and feature attribution so ranking changes can be measured instead of guessed:
+
+```sh
+python eval_retrieval.py --verbose
+```
+
+The labels file references a personal index and is not part of the public bundle; keep only synthetic or explicitly public labels in shared material.
+
 ## Privacy and contribution
 
 Personal catalogs, source snapshots, cards, databases and generated indexes stay local in ignored paths. The local HTTP server binds to `127.0.0.1`; `--public-only` excludes private and visibility-unknown entries before ranking and pagination. This is not internet hosting or authentication. Captured third-party text keeps its own rights; it is not covered by this project's [MIT license](LICENSE). See [CONTRIBUTING.md](CONTRIBUTING.md).
