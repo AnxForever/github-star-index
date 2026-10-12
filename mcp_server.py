@@ -99,6 +99,7 @@ _TOOLS: list[dict[str, Any]] = [
                 "archived": {"type": "boolean", "description": "Filter archived status; omit to include both."},
                 "evidence_level": {"type": "string", "enum": ["metadata", "readme", "docs", "source"]},
                 "extra_terms": {"type": "array", "items": {"type": "string", "maxLength": 128}, "maxItems": 20},
+                "semantic": {"type": "boolean", "description": "Fuse the optional embedding layer when the index has vectors. Omit for auto; set false for lexical-only."},
             },
             "required": ["query"],
             "additionalProperties": False,
@@ -248,10 +249,13 @@ def _handle_tool(service: IndexService, params: object, *, modern: bool) -> dict
                 raise ValueError("read_repository_evidence requires full_name and evidence_ids")
             value = AgentContext(service).evidence(arguments["full_name"], arguments["evidence_ids"])
         elif name == "search_repositories":
-            allowed = {"query", "limit", "kind", "language", "archived", "evidence_level", "extra_terms"}
+            allowed = {"query", "limit", "kind", "language", "archived", "evidence_level", "extra_terms", "semantic"}
             unknown = set(arguments) - allowed
             if unknown:
                 raise ValueError("Unknown search argument")
+            semantic = arguments.get("semantic")
+            if semantic is not None and not isinstance(semantic, bool):
+                raise ValueError("semantic must be a boolean")
             value = service.search(
                 arguments.get("query"),
                 limit=arguments.get("limit", 12),
@@ -260,6 +264,7 @@ def _handle_tool(service: IndexService, params: object, *, modern: bool) -> dict
                 archived=arguments.get("archived"),
                 evidence_level=arguments.get("evidence_level"),
                 extra_terms=arguments.get("extra_terms", []),
+                semantic=semantic,
             )
         elif name == "get_repository":
             if set(arguments) != {"full_name"}:

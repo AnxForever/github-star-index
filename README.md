@@ -72,9 +72,28 @@ Open http://127.0.0.1:8765. The demo uses four fictional repositories and synthe
 
 ## Retrieval and evidence limits
 
-Search uses bilingual SQLite FTS5 lexical matching without embeddings or model reranking. Candidate order is not a suitability score. Missing terms mean unknown, not unsupported. Source-level analysis samples representative paths; it is not a complete audit or runtime verification. A citation matching captured lines does not prove that the interpretation is correct.
+Search uses bilingual SQLite FTS5 lexical matching by default. Candidate order is not a suitability score. Missing terms mean unknown, not unsupported. Source-level analysis samples representative paths; it is not a complete audit or runtime verification. A citation matching captured lines does not prove that the interpretation is correct.
 
-Each candidate and detail view reports the catalog `license` (SPDX id, or `null` when GitHub gives none). It is a reuse constraint signal from synced metadata, not a license-compliance conclusion.
+### Optional semantic retrieval
+
+Spoken or paraphrased tasks can share few literal words with a repository, which pure lexical matching misses. When an embedding provider is configured and vectors are built, `find` and `search` fuse lexical and embedding similarity with reciprocal rank fusion. Without a provider, or without vectors, everything behaves as lexical-only, and results carry `semantic: null`.
+
+Plain-text tasks remain fully local. The embedding step is the only part that contacts a provider, and only when you run it:
+
+```sh
+# Configure once (environment variables or data/embeddings.json, both gitignored)
+export GSI_EMBEDDING_API_KEY=...            # required
+# optional: GSI_EMBEDDING_BASE_URL (default https://api.openai.com/v1)
+# optional: GSI_EMBEDDING_MODEL (default text-embedding-3-small)
+# optional: GSI_EMBEDDING_DIMENSIONS, GSI_EMBEDDING_BATCH
+
+python search.py build          # creates the index and empty embedding table
+python search.py embed          # embed card/feature text; re-run after rebuild
+python search.py embed-status   # report vectors, model, and configuration
+python search.py search "..." --semantic off   # force lexical-only
+```
+
+An OpenAI-compatible `/embeddings` endpoint is expected. Vectors from one model are never compared against a differently configured model; a mismatch disables fusion instead of guessing. Each candidate and detail view reports the catalog `license` (SPDX id, or `null` when GitHub gives none). It is a reuse constraint signal from synced metadata, not a license-compliance conclusion.
 
 `eval_retrieval.py` scores retrieval against a labeled task set (`data/eval/labels.json`, kept local). It reports recall@k, precision@k, MRR, empty results and feature attribution so ranking changes can be measured instead of guessed:
 

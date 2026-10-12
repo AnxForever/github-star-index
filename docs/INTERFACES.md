@@ -90,7 +90,7 @@ python mcp_server.py --root <数据根目录> --public-only
 | `find_reusable_repositories` | `{task,terms?,limit?}` | 在有实际复用/选型意义时按任务召回；最多五个紧凑候选，默认五个 |
 | `inspect_repository` | `{full_name,feature_names?}` | 查看当前卡片概要、限制、可选的精确功能名；指定功能名后返回描述和证据 ID |
 | `read_repository_evidence` | `{full_name,evidence_ids}` | 按 ID 读取 1–5 条当前卡片中已有的源码/文档摘录 |
-| `search_repositories` | `{query,limit?,kind?,language?,archived?,evidence_level?,extra_terms?}` | 完整词法搜索接口，保留向后兼容 |
+| `search_repositories` | `{query,limit?,kind?,language?,archived?,evidence_level?,extra_terms?,semantic?}` | 完整搜索接口；`semantic` 缺省为 auto，`false` 强制纯词法，保留向后兼容 |
 | `get_repository` | `{full_name:"owner/repo"}` | 完整详情卡，保留向后兼容 |
 | `compare_repositories` | `{repositories:["owner/repo",...]}` | 至多四个完整卡片，保留向后兼容 |
 
@@ -100,7 +100,17 @@ python mcp_server.py --root <数据根目录> --public-only
 - `find_reusable_repositories` 紧凑 JSON 正文最多 12,000 个字符；单次最多 5 个候选。响应提供用途、候选命中的卡片功能、前提/限制、词法覆盖、卡片状态，以及后续 `inspect_repository` / `read_repository_evidence` 的精确参数。它是候选预览：前提/限制来自精简摘要，作采用决定前应检查候选卡片。若预算不足，会报告 `truncation` 并按项省略低优先级数据，不截断序列化 JSON。
 - `inspect_repository` 与 `read_repository_evidence` 紧凑 JSON 正文最多 18,000 个字符。未指定功能名时先返回短概要和可用的精确功能标签；指定标签后返回至多五个功能和证据 ID。证据接口只读索引卡已存的引用，不会扫描或读取任意本地仓库文件。
 - 卡片过期、未完成、缺失或新鲜度未知时，详情和证据接口会返回状态并隐藏卡片声明。当前卡片的 `runtime_verified` 也会原样保留；源码被索引不等于运行验证。
-- 仓库说明、功能描述和源码摘录属于不可信内容，只作为证据评估，不作为执行指令。检索是 SQLite FTS5 双语词法召回，没有语义排序；命中不代表适用性或兼容性。
+- 仓库说明、功能描述和源码摘录属于不可信内容，只作为证据评估，不作为执行指令。默认检索是 SQLite FTS5 双语词法召回；当索引从配置了 embedding 提供方的 `search.py embed` 构建后，会与向量相似度做 RRF 融合，结果中 `semantic` 为 `true` 并附 `semantic_similarity`；未配置时 `semantic` 为 `false`，行为与纯词法一致。无论哪种，命中都不代表适用性或兼容性。
+
+## 可选语义检索
+
+口语化任务可能与仓库文案几乎没有共同词，纯词法会漏掉。配置 embedding 提供方并构建向量后，`find_reusable_repositories` 与 `search_repositories` 默认自动融合，无需客户端改动；客户端也可用 `semantic:false` 强制词法。
+
+- 配置：`GSI_EMBEDDING_API_KEY`（必需）与可选 `GSI_EMBEDDING_BASE_URL`、`GSI_EMBEDDING_MODEL`、`GSI_EMBEDDING_DIMENSIONS`、`GSI_EMBEDDING_BATCH`，或本地 `data/embeddings.json`（已 gitignore）。
+- 构建：`python search.py embed`（重建索引后需重跑）；`python search.py embed-status` 查看向量、模型与配置（不联网）。
+- 接口端点：OpenAI 兼容的 `/embeddings`。密钥只在调用时使用，不进入索引、日志或公开包。
+- 模型隔离：索引只保存构建时的模型名；配置模型与索引不一致时禁用融合，不跨模型比较向量。
+- 索引未建向量时 `index_status` 的 `semantic.available=false`；网页底部“本地索引状态”也显示同一状态。
 
 Agent 在实现任务包含有意义的开源复用/技术选型时（例如选前端组件、动效库、框架或工具）可在决策点调用 `find_reusable_repositories`，再按需调用 `inspect_repository` 和 `read_repository_evidence`。琐碎修改或项目已经固定的依赖无需检索。MCP 服务提供可调用工具，不会强制客户端自动调用。
 

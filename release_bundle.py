@@ -11,10 +11,10 @@ ROOT = Path(__file__).resolve().parent
 VERSION = "0.1.0-preview"
 PUBLIC_FILES = (
     ".gitignore", "ANALYSIS_GUIDE.md", "LICENSE", "README.md", "CONTRIBUTING.md", "CHANGELOG.md",
-    "schema.json", "search.py", "catalog_sync.py", "source_sync.py", "refresh.py", "card_tools.py",
+    "schema.json", "search.py", "embeddings.py", "catalog_sync.py", "source_sync.py", "refresh.py", "card_tools.py",
     "render_catalog.py", "audit_index.py", "analysis.py", "service.py", "agent_context.py", "webapp.py", "mcp_server.py",
     "demo.py", "release_bundle.py", "eval_retrieval.py", "examples/demo/fixtures.json",
-    "tests/test_search.py", "tests/test_sources.py",
+    "tests/test_search.py", "tests/test_sources.py", "tests/test_embeddings.py",
     "web/index.html", "web/app.js", "web/styles.css",
     "web/icons.js", "web/theme.js", "web/THIRD_PARTY_NOTICES.txt",
     "web/fonts/Geist-Variable.woff2", "web/fonts/OFL.txt",

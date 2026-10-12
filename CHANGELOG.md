@@ -2,6 +2,7 @@
 
 ## 0.1.0 preview — unreleased
 
+- Optional semantic retrieval: an embedding layer (`embeddings.py`) and `search.py embed` / `embed-status` commands fuse lexical and vector ranking with reciprocal rank fusion. Off by default and fully inert without a configured provider, so existing lexical behavior is unchanged. The only network step is the embedding build, which the user runs explicitly.
 - Retrieval quality: unknown multi-character Chinese phrases no longer collapse into one conjunctive concept group, which previously made queries such as “向量数据库检索” return zero candidates.
 - Retrieval quality: broader bilingual concept coverage (vector database, transcription, speech synthesis, crawler, database, chat, deploy, prompt, fine-tune, evaluation), so operational terms map to real repositories instead of noise bigrams.
 - Feature attribution: `matched_features` now fires whenever a feature's own indexed text matched the query, independent of which document ranked first, instead of requiring the feature to be the primary hit. Attribution stays strict, so repository-level context cannot light up unrelated features.

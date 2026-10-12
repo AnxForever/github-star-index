@@ -45,6 +45,8 @@
     indexBuilt: $("#index-built"),
     connectionDot: $("#connection-dot"),
     connectionLabel: $("#connection-label"),
+    semanticDot: $("#semantic-dot"),
+    semanticLabel: $("#semantic-label"),
     modeLabel: $("#mode-label"),
     demoNotice: $("#demo-notice"),
     filterDetails: $("#filter-details"),
@@ -159,6 +161,23 @@
     dom.connectionLabel.textContent = label;
   }
 
+  function updateSemanticStatus(semantic) {
+    const info = semantic && typeof semantic === "object" ? semantic : {};
+    const vectors = Number(info.vectors) || 0;
+    const configured = info.configured === true;
+    const available = info.available === true;
+    dom.semanticDot.classList.toggle("is-online", available);
+    dom.semanticDot.classList.toggle("is-offline", !available);
+    if (available) {
+      const model = Array.isArray(info.models) && info.models.length ? "（" + info.models.join(", ") + "）" : "";
+      dom.semanticLabel.textContent = `语义检索：已启用，${vectors.toLocaleString("zh-CN")} 条向量${model}`;
+    } else if (configured) {
+      dom.semanticLabel.textContent = "语义检索：已配置但尚未构建向量，运行 python search.py embed";
+    } else {
+      dom.semanticLabel.textContent = "语义检索：未配置，当前为词法检索";
+    }
+  }
+
   function formatDate(value) {
     if (typeof value !== "string" || !value) return "";
     const date = new Date(value);
@@ -253,6 +272,7 @@
     const modes = { local: "本地索引", public: "公开索引", demo: "演示模式" };
     dom.modeLabel.textContent = modes[info.mode] || "索引模式未知";
     dom.demoNotice.hidden = info.mode !== "demo";
+    updateSemanticStatus(info.semantic);
     setConnection(true, "本地索引可读");
   }
 

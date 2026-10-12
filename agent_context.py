@@ -214,6 +214,13 @@ def _status(detail: dict[str, Any], service: IndexService) -> str:
     return status
 
 
+def _method_label(result: Any) -> str:
+    base = "SQLite FTS5 lexical search with bilingual concept expansion"
+    if isinstance(result, dict) and (result.get("retrieval") or {}).get("semantic"):
+        return base + " fused with optional embedding similarity (RRF)"
+    return base
+
+
 def _repo_metadata(repo: Any) -> dict[str, Any]:
     if not isinstance(repo, dict):
         return {}
@@ -375,8 +382,10 @@ class AgentContext:
             **_mode_fields(self.service),
             "task": task.strip(),
             "retrieval": {
-                "method": "SQLite FTS5 lexical search with bilingual concept expansion",
+                "method": _method_label(result),
                 "ranking_is_suitability_score": False,
+                "semantic": bool((result.get("retrieval") or {}).get("semantic")),
+                "semantic_candidates": int((result.get("retrieval") or {}).get("semantic_candidates") or 0),
                 "query_terms": query_terms,
                 "query_terms_truncated": query_truncated or (isinstance(result.get("query_terms"), list) and len(result["query_terms"]) > len(query_terms)),
                 "omitted_query_terms": max(0, len(result.get("query_terms", [])) - len(query_terms)) if isinstance(result.get("query_terms"), list) else 0,

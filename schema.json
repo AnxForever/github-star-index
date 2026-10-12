@@ -4,6 +4,7 @@
   "cards_dir": "data/cards",
   "sources_dir": "data/sources",
   "database": "data/index.sqlite3",
+  "embeddings_config": "data/embeddings.json",
   "repository": {
     "full_name": "owner/repo",
     "url": "https://github.com/owner/repo",

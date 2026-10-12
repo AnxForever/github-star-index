@@ -24,6 +24,15 @@ _SENSITIVE_KEYS = {
 }
 
 
+def _embedding_status_safe(root: Path, db_path: Path | None) -> dict[str, Any]:
+    """Report the optional semantic layer without failing the whole info call."""
+    try:
+        return _search.embedding_status(root=root, db_path=db_path)
+    except (_search.IndexErrorBase, _search.sqlite3.Error, OSError, ValueError) as exc:
+        return {"available": False, "vectors": 0, "dims": 0, "models": [], "configured": False,
+                "error": type(exc).__name__}
+
+
 def _clean_public_value(value: Any) -> Any:
     """Remove machine-local paths and obvious credential fields recursively."""
     if isinstance(value, dict):
@@ -326,6 +335,7 @@ class IndexService:
                 "languages": languages,
                 "evidence_levels": evidence_levels,
             },
+            "semantic": _embedding_status_safe(self.root, self.db_path),
             "mode": self.mode,
         }
 
@@ -392,6 +402,7 @@ class IndexService:
         archived: bool | None = None,
         evidence_level: str | None = None,
         extra_terms: list[str] | None = None,
+        semantic: bool | None = None,
     ) -> dict[str, Any]:
         if not isinstance(query, str) or not query.strip() or len(query) > 2000:
             raise ValueError("query must be a non-empty string of at most 2000 characters")
@@ -418,6 +429,7 @@ class IndexService:
             evidence_level=evidence_level,
             extra_terms=extra_terms,
             include_private=not self.public_only,
+            semantic=semantic,
         )
         results = result.get("results", [])
         rows_by_name: dict[str, sqlite3.Row] = {}

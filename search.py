@@ -19,6 +19,8 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from urllib.parse import quote
 
+import embeddings as _embeddings
+
 ROOT = Path(__file__).resolve().parent
 _CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\U00020000-\U000323af]+")
 _TOKEN_RE = re.compile(
@@ -508,6 +510,18 @@ def _create_db(conn: sqlite3.Connection) -> None:
             full_name UNINDEXED, doc_type UNINDEXED, path UNINDEXED, source_sha UNINDEXED,
             title, content, tokenize='unicode61 remove_diacritics 2'
         );
+        -- Optional semantic layer. Populated only by `python search.py embed` when
+        -- an embedding provider is configured; an empty table leaves lexical
+        -- retrieval unchanged. Vectors are normalized float32 blobs.
+        CREATE TABLE document_embeddings (
+            doc_id INTEGER PRIMARY KEY REFERENCES documents(id),
+            full_name TEXT NOT NULL,
+            model TEXT NOT NULL,
+            dims INTEGER NOT NULL,
+            vector BLOB NOT NULL
+        );
+        CREATE INDEX document_embeddings_repo_idx ON document_embeddings(full_name);
+        CREATE INDEX document_embeddings_model_idx ON document_embeddings(model);
         """
     )
 
@@ -854,6 +868,99 @@ def _connect(db_path: Path) -> sqlite3.Connection:
     return conn
 
 
+# Documents whose text is worth embedding for task-level retrieval. Card-derived
+# text is the highest signal and keeps the embedding pass bounded in cost.
+_EMBEDDING_DOC_TYPES = ("metadata", "card", "card_detail", "feature")
+
+
+def build_embeddings(
+    root: str | Path = ROOT,
+    db_path: str | Path | None = None,
+    *,
+    cfg: "_embeddings.EmbeddingConfig | None" = None,
+    force: bool = False,
+) -> dict:
+    """Populate the optional embedding table from existing indexed documents.
+
+    Requires a configured provider. Run after ``build``. Re-running replaces
+    vectors for the selected model so a model change is explicit.
+    """
+    root_path = Path(root).resolve()
+    index_path = _db_path(root_path, db_path)
+    if not index_path.is_file():
+        raise IndexErrorBase(f"Index not found: {index_path}. Run `python search.py build` first.")
+    try:
+        active = cfg or _embeddings.config(root_path)
+    except _embeddings.EmbeddingError as exc:
+        raise IndexErrorBase(str(exc)) from exc
+    if active is None:
+        raise IndexErrorBase(
+            "No embedding provider configured. Set GSI_EMBEDDING_API_KEY (and optionally "
+            "GSI_EMBEDDING_BASE_URL, GSI_EMBEDDING_MODEL) or provide data/embeddings.json."
+        )
+    conn = sqlite3.connect(index_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        if not conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='document_embeddings'"
+        ).fetchone():
+            raise IndexErrorBase(
+                "This index predates the embedding layer. Rebuild it with `python search.py build` first."
+            )
+        placeholders = ",".join("?" for _ in _EMBEDDING_DOC_TYPES)
+        rows = conn.execute(
+            f"SELECT id,full_name,doc_type,title,content FROM documents WHERE doc_type IN ({placeholders}) ORDER BY id",
+            _EMBEDDING_DOC_TYPES,
+        ).fetchall()
+        existing = {
+            row["doc_id"] for row in conn.execute(
+                "SELECT doc_id FROM document_embeddings WHERE model=?", (active.model,)
+            ).fetchall()
+        }
+        if not force:
+            rows = [row for row in rows if row["id"] not in existing]
+        if not rows:
+            return {"model": active.model, "embedded": 0, "skipped": len(existing), "total": len(existing)}
+        texts = [f"{row['title']}\n{row['content']}".strip() for row in rows]
+        vectors = _embeddings.embed(texts, cfg=active)
+        if len(vectors) != len(rows):
+            raise IndexErrorBase("Embedding provider returned a mismatched number of vectors")
+        conn.execute("DELETE FROM document_embeddings WHERE model=?", (active.model,))
+        conn.executemany(
+            "INSERT OR REPLACE INTO document_embeddings(doc_id,full_name,model,dims,vector) VALUES(?,?,?,?,?)",
+            [
+                (row["id"], row["full_name"], active.model, len(vector), _embeddings.pack_vector(vector))
+                for row, vector in zip(rows, vectors)
+            ],
+        )
+        conn.commit()
+        total = conn.execute("SELECT COUNT(*) FROM document_embeddings WHERE model=?", (active.model,)).fetchone()[0]
+    finally:
+        conn.close()
+    return {"model": active.model, "embedded": len(rows), "skipped": len(existing), "total": int(total)}
+
+
+def embedding_status(root: str | Path = ROOT, db_path: str | Path | None = None) -> dict:
+    """Report the optional semantic layer without contacting the network."""
+    root_path = Path(root).resolve()
+    index_path = _db_path(root_path, db_path)
+    conn = _connect(index_path)
+    try:
+        state = _embedding_index_state(conn)
+    finally:
+        conn.close()
+    configured = False
+    public_config: dict | None = None
+    try:
+        cfg = _embeddings.config(root_path)
+    except _embeddings.EmbeddingError as exc:
+        return {**state, "configured": False, "config_error": str(exc)}
+    if cfg is not None:
+        configured = True
+        public_config = cfg.public()
+    return {**state, "configured": configured, "config": public_config}
+
+
 def _query_excerpt(
     content: str,
     terms: list[str],
@@ -953,6 +1060,68 @@ def _repo_row(row: sqlite3.Row) -> dict:
     }
 
 
+def _signal_text(row: sqlite3.Row) -> str:
+    """Return the text used for concept coverage of one document."""
+    joined = row["content"] if row["doc_type"] == "source_doc" else row["title"] + "\n" + row["content"]
+    return _visible_text(joined) if row["doc_type"] == "source_doc" else joined
+
+
+def _primary_document(conn: sqlite3.Connection, full_name: str) -> sqlite3.Row | None:
+    """Pick a representative document for a repository with no lexical hit.
+
+    Preference mirrors the lexical ranking's document priority so a
+    semantic-only candidate still shows its most decision-relevant text.
+    """
+    row = conn.execute(
+        "SELECT d.id,d.full_name,d.doc_type,d.title,d.evidence_level,d.path,d.source_sha,"
+        "d.line_start,d.line_end,d.content,d.evidence_json "
+        "FROM documents d WHERE d.full_name=? "
+        "ORDER BY CASE d.doc_type WHEN 'card' THEN 0 WHEN 'feature' THEN 1 WHEN 'card_detail' THEN 2 "
+        "WHEN 'source_doc' THEN 3 ELSE 4 END, d.id LIMIT 1",
+        (full_name,),
+    ).fetchone()
+    return row
+
+
+def _filtered_repo_names(
+    conn: sqlite3.Connection,
+    *,
+    kind: str | None,
+    language: str | None,
+    archived: bool | None,
+    evidence_level: str | None,
+    include_private: bool,
+) -> set[str] | None:
+    """Return the set of repository names allowed by active filters.
+
+    Returns None when nothing restricts the set, so the caller can skip the
+    membership check. Needed because semantic-only candidates do not pass
+    through the filtered FTS query.
+    """
+    clauses: list[str] = []
+    params: list = []
+    if not include_private:
+        clauses.append("private = 0")
+    if kind:
+        clauses.append("kind = ?")
+        params.append(kind)
+    if language:
+        clauses.append("lower(language) = lower(?)")
+        params.append(language)
+    if archived is not None:
+        clauses.append("archived = ?")
+        params.append(int(archived))
+    if evidence_level:
+        clauses.append("evidence_level = ?")
+        params.append(evidence_level)
+    if not clauses:
+        return None
+    rows = conn.execute(
+        "SELECT full_name FROM repositories WHERE " + " AND ".join(clauses), params
+    ).fetchall()
+    return {row["full_name"] for row in rows}
+
+
 def _load_evidence(json_value: str | None, full_name: str, source_sha: str | None, *, excerpt_limit: int | None = None) -> list[dict]:
     if not json_value:
         return []
@@ -973,6 +1142,91 @@ def _load_evidence(json_value: str | None, full_name: str, source_sha: str | Non
     return result
 
 
+def _embedding_index_state(conn: sqlite3.Connection) -> dict:
+    """Summarize the optional embedding layer without touching the network."""
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS count, COALESCE(MAX(dims),0) AS dims FROM document_embeddings"
+        ).fetchone()
+        models = [entry[0] for entry in conn.execute(
+            "SELECT DISTINCT model FROM document_embeddings"
+        ).fetchall()]
+    except sqlite3.OperationalError:
+        return {"available": False, "vectors": 0, "dims": 0, "models": []}
+    count = int(row["count"] or 0) if row is not None else 0
+    return {
+        "available": count > 0,
+        "vectors": count,
+        "dims": int(row["dims"] or 0) if row is not None else 0,
+        "models": [str(model) for model in models if model],
+    }
+
+
+def _semantic_rank(
+    conn: sqlite3.Connection,
+    query: str,
+    *,
+    root: Path,
+    model: str | None,
+    restrict_to: set[str] | None = None,
+) -> dict[str, float]:
+    """Return repository -> best cosine similarity using stored vectors.
+
+    Returns an empty mapping when the layer is unsettled: no provider, no
+    vectors, or an index built with a different model than the configured one.
+    """
+    state = _embedding_index_state(conn)
+    if not state["available"]:
+        return {}
+    if model and state["models"] and model not in state["models"]:
+        # Vectors from another model are not comparable; do not guess.
+        return {}
+    try:
+        query_vector = _embeddings.embed([query], root=root)[0]
+    except _embeddings.EmbeddingError:
+        return {}
+    sql = "SELECT doc_id,full_name,vector,dims FROM document_embeddings"
+    params: list = []
+    if model:
+        sql += " WHERE model=?"
+        params.append(model)
+    rows = conn.execute(sql, params).fetchall()
+    if not rows:
+        return {}
+    usable = [row for row in rows if _embeddings.vector_size_matches(row["vector"], int(row["dims"] or 0))]
+    if not usable:
+        return {}
+    try:
+        ranked = _embeddings.rank_by_similarity(query_vector, [row["vector"] for row in usable])
+    except _embeddings.EmbeddingError:
+        return {}
+    scores: dict[str, float] = {}
+    for position, similarity in ranked:
+        name = usable[position]["full_name"]
+        if restrict_to is not None and name not in restrict_to:
+            continue
+        previous = scores.get(name)
+        if previous is None or similarity > previous:
+            scores[name] = similarity
+    return scores
+
+
+def _rrf_fuse(lexical_order: list[str], semantic_scores: dict[str, float], *, weight: float = 1.0, k: int = 60) -> list[str]:
+    """Reciprocal-rank fusion of a lexical order and semantic similarities.
+
+    RRF combines ranked lists without calibrating their raw scores, so a
+    paraphrase hit and a keyword hit contribute on comparable terms.
+    """
+    scores: dict[str, float] = {}
+    for position, name in enumerate(lexical_order, 1):
+        scores[name] = scores.get(name, 0.0) + 1.0 / (k + position)
+    for position, (name, _similarity) in enumerate(
+        sorted(semantic_scores.items(), key=lambda item: (-item[1], item[0])), 1
+    ):
+        scores[name] = scores.get(name, 0.0) + weight * (1.0 / (k + position))
+    return sorted(scores, key=lambda name: (-scores[name], name.casefold()))
+
+
 def search_repositories(
     query: str,
     *,
@@ -985,6 +1239,7 @@ def search_repositories(
     evidence_level: str | None = None,
     extra_terms: list[str] | None = None,
     include_private: bool = True,
+    semantic: bool | None = None,
 ) -> dict:
     root_path = Path(root).resolve()
     index_path = _db_path(root_path, db_path)
@@ -1041,16 +1296,53 @@ def search_repositories(
             ranked.setdefault(row["full_name"], []).append((sort_key, row, coverage))
         for repo_rows in ranked.values():
             repo_rows.sort(key=lambda item: item[0])
-        repo_order = sorted(ranked, key=lambda name: ranked[name][0][0])
+        lexical_order = sorted(ranked, key=lambda name: ranked[name][0][0])
+
+        # Optional semantic fusion. It only engages when an embedding provider is
+        # configured AND the index actually holds vectors, so a lexical-only
+        # index behaves exactly as before.
+        semantic_scores: dict[str, float] = {}
+        semantic_model: str | None = None
+        if semantic is not False:
+            try:
+                cfg = _embeddings.config(root_path)
+            except _embeddings.EmbeddingError:
+                cfg = None
+            if cfg is not None:
+                semantic_model = cfg.model
+                semantic_scores = _semantic_rank(conn, query, root=root_path, model=cfg.model)
+        semantic_used = bool(semantic_scores)
+        if semantic_used:
+            repo_order = _rrf_fuse(lexical_order, semantic_scores)[: max(limit * 4, 24)]
+        else:
+            repo_order = lexical_order
+
+        allowed = _filtered_repo_names(conn, kind=kind, language=language, archived=archived,
+                                       evidence_level=evidence_level, include_private=include_private)
+
         result = []
         for full_name in repo_order:
-            ranked_rows = ranked[full_name]
-            primary = ranked_rows[0][1]
-            rows = [item[1] for item in ranked_rows]
-            primary_coverage = ranked_rows[0][2]
+            if allowed is not None and full_name not in allowed:
+                continue
+            ranked_rows = ranked.get(full_name)
             repo_row = conn.execute("SELECT * FROM repositories WHERE full_name=?", (full_name,)).fetchone()
             if repo_row is None:
                 continue
+            if ranked_rows:
+                primary = ranked_rows[0][1]
+                rows = [item[1] for item in ranked_rows]
+                primary_coverage = ranked_rows[0][2]
+            else:
+                # Semantic-only candidate: keep a stable representative document
+                # for the excerpt and coverage labels instead of inventing a hit.
+                primary = _primary_document(conn, full_name)
+                if primary is None:
+                    continue
+                rows = [primary]
+                primary_coverage = _group_coverage(
+                    _signal_text(primary), groups,
+                    window_lines=4 if primary["doc_type"] == "source_doc" else None,
+                )
             meta = _repo_row(repo_row)
             snippet = _query_excerpt(primary["content"], terms, primary["line_start"], groups,
                                      strip_markup=primary["doc_type"] == "source_doc")
@@ -1082,7 +1374,7 @@ def search_repositories(
             # unrelated capabilities are not reported just because the
             # repository's card or README also surfaced.
             feature_matches: list[dict] = []
-            for sort_key, row, coverage in ranked_rows:
+            for sort_key, row, coverage in (ranked_rows or []):
                 if row["doc_type"] != "feature" or coverage[1] < 1:
                     continue
                 feature_matches.append({
@@ -1115,11 +1407,14 @@ def search_repositories(
             result.append({**meta, "lexical_coverage": {"matched_groups": matched_groups, "total_groups": total_groups,
                                                             "ratio": round(ratio, 3), "matched": matched_labels,
                                                             "missing": missing_labels},
+                           "semantic_similarity": round(semantic_scores[full_name], 4) if full_name in semantic_scores else None,
                            "match": match_out, "evidence": evidence,
                            "feature_matches": feature_matches})
             if len(result) >= limit:
                 break
-        return {"query": query, "query_terms": terms, "count": len(result), "results": result}
+        return {"query": query, "query_terms": terms, "count": len(result), "results": result,
+                "retrieval": {"semantic": semantic_used, "semantic_model": semantic_model if semantic_used else None,
+                              "semantic_candidates": len(semantic_scores)}}
     except sqlite3.OperationalError as exc:
         if "no such table" in str(exc).casefold() or "no such column" in str(exc).casefold():
             raise IndexErrorBase(f"Index schema is invalid: {index_path}. Rebuild it with `python search.py build`.") from exc
@@ -1251,6 +1546,15 @@ def main(argv: list[str] | None = None) -> int:
     _add_db_argument(build_parser)
     build_parser.add_argument("--json", action="store_true")
 
+    embed_parser = sub.add_parser("embed", help="build the optional embedding layer (needs a provider)")
+    _add_db_argument(embed_parser)
+    embed_parser.add_argument("--force", action="store_true", help="re-embed every document, not only new ones")
+    embed_parser.add_argument("--json", action="store_true")
+
+    embed_status_parser = sub.add_parser("embed-status", help="report the optional embedding layer")
+    _add_db_argument(embed_status_parser)
+    embed_status_parser.add_argument("--json", action="store_true")
+
     search_parser = sub.add_parser("search", help="search repository purpose and evidence")
     search_parser.add_argument("query", nargs="+", help="natural-language query")
     search_parser.add_argument("--kind")
@@ -1259,6 +1563,8 @@ def main(argv: list[str] | None = None) -> int:
     search_parser.add_argument("--evidence-level", choices=("metadata", "readme", "docs", "source"))
     search_parser.add_argument("--limit", type=int, default=10)
     search_parser.add_argument("--terms", action="append", nargs="+", default=[], help="extra search terms; repeatable")
+    search_parser.add_argument("--semantic", choices=("auto", "off"), default="auto",
+                               help="fuse the optional embedding layer when configured (default: auto)")
     search_parser.add_argument("--json", action="store_true")
     search_parser.add_argument("--public-only", action="store_true", help="Exclude private and unknown-visibility repositories")
     _add_db_argument(search_parser)
@@ -1283,12 +1589,19 @@ def main(argv: list[str] | None = None) -> int:
             result = search_repositories(" ".join(options.query), root=options.root, db_path=options.db, limit=options.limit,
                                          kind=options.kind, language=options.language, archived=archived,
                                          evidence_level=options.evidence_level, extra_terms=extras,
-                                         include_private=not options.public_only)
+                                         include_private=not options.public_only,
+                                         semantic=(False if options.semantic == "off" else None))
             # feature_matches is the service-side attribution input; the public
             # search surface does not repeat it.
             for item in result.get("results", []):
                 item.pop("feature_matches", None)
             print(json.dumps(result, ensure_ascii=False, indent=2) if options.json else _format_search(result))
+        elif options.command == "embed":
+            result = build_embeddings(root=options.root, db_path=options.db, force=options.force)
+            print(json.dumps(result, ensure_ascii=False, indent=2) if options.json else json.dumps(result, ensure_ascii=False, indent=2))
+        elif options.command == "embed-status":
+            result = embedding_status(root=options.root, db_path=options.db)
+            print(json.dumps(result, ensure_ascii=False, indent=2) if options.json else json.dumps(result, ensure_ascii=False, indent=2))
         elif options.command == "show":
             result = show_repo(options.repository, root=options.root, db_path=options.db)
             print(json.dumps(result, ensure_ascii=False, indent=2) if options.json else json.dumps(result, ensure_ascii=False, indent=2))
